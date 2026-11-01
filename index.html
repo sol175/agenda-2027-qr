@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agenda 2027 — Plantilla QR</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+  <style>
+    :root {
+      --ink: #1f1c1a;
+      --soft: #6e6864;
+      --line: #b8b0a8;
+      --terra: #9e4838;
+      /* 28 mm a 96 dpi ≈ 105.8 px; usamos mm en impresión */
+      --qr: 28mm;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      background: #f3efe9;
+    }
+    .screen {
+      max-width: 42rem;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+    h1 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; font-size: 1.75rem; margin: 0 0 0.35rem; }
+    .sub { color: var(--soft); font-size: 0.9rem; margin-bottom: 1.25rem; }
+    label { display: block; font-size: 0.8rem; color: var(--soft); margin-bottom: 0.35rem; }
+    input, select {
+      width: 100%;
+      padding: 0.65rem 0.75rem;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      font-size: 1rem;
+      margin-bottom: 0.85rem;
+      background: #fff;
+    }
+    .row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .row > * { flex: 1; min-width: 10rem; }
+    button {
+      background: var(--terra);
+      color: #fff;
+      border: 0;
+      padding: 0.7rem 1.1rem;
+      font-size: 0.95rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button.secondary { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+    .hint { font-size: 0.8rem; color: var(--soft); line-height: 1.45; margin: 1rem 0; }
+    .hint code { font-size: 0.78rem; background: #fff; padding: 0.1rem 0.3rem; border-radius: 3px; }
+    .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+
+    /* Hoja imprimible A4 */
+    .sheet {
+      display: none;
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      padding: 18mm;
+      background: #fff;
+    }
+    .sheet h2 {
+      font-family: Georgia, serif;
+      font-weight: 400;
+      font-size: 18pt;
+      margin: 0;
+    }
+    .sheet .meta { float: right; color: var(--soft); font-size: 9pt; margin-top: 0.35rem; }
+    .sheet hr { border: 0; border-top: 0.4pt solid var(--line); margin: 8mm 0 6mm; clear: both; }
+    .sheet .steps { font-size: 9pt; color: var(--soft); line-height: 1.45; margin-bottom: 8mm; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, var(--qr));
+      grid-template-rows: repeat(2, var(--qr));
+      gap: 10mm;
+      justify-content: center;
+      margin-top: 6mm;
+    }
+    .cell {
+      width: var(--qr);
+      height: var(--qr);
+      border: 0.6pt dashed var(--soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .cell img, .cell canvas, .cell svg {
+      width: 23mm;
+      height: 23mm;
+    }
+    .cell::before, .cell::after {
+      content: "";
+      position: absolute;
+      width: 2.2mm;
+      height: 2.2mm;
+      border-color: var(--terra);
+      border-style: solid;
+    }
+    /* marcas esquina simplificadas vía outline del dashed */
+
+    .sheet .foot {
+      position: absolute;
+      bottom: 14mm;
+      left: 18mm;
+      right: 18mm;
+      text-align: center;
+      font-size: 8pt;
+      color: var(--soft);
+    }
+
+    @media print {
+      body { background: #fff; }
+      .screen { display: none !important; }
+      .sheet {
+        display: block !important;
+        padding: 18mm;
+        margin: 0;
+        box-shadow: none;
+        position: relative;
+      }
+      @page { size: A4; margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <h1>Plantilla QR — Agenda 2027</h1>
+    <p class="sub">Generá el código al tamaño exacto del adhesivo e imprimí en papel común A4.</p>
+
+    <div class="row">
+      <div>
+        <label for="tipo">Tipo de dato</label>
+        <select id="tipo">
+          <option value="wa">WhatsApp</option>
+          <option value="tel">Teléfono</option>
+          <option value="mailto">Correo</option>
+          <option value="url">Link (Instagram, web…)</option>
+          <option value="text">Texto libre</option>
+        </select>
+      </div>
+    </div>
+
+    <label for="dato" id="datoLabel">Número (con código de país, sin 0 ni 15)</label>
+    <input id="dato" type="text" placeholder="54911XXXXXXXX" autocomplete="off" />
+
+    <p class="hint" id="ayuda">
+      Ejemplo Argentina: <code>54911XXXXXXXX</code> (54 + 9 + área sin 0 + número).
+      El QR abrirá un chat de WhatsApp.
+    </p>
+
+    <div class="actions">
+      <button type="button" id="btnGen">Generar plantilla</button>
+      <button type="button" class="secondary" id="btnPrint">Imprimir A4 (escala 100%)</button>
+    </div>
+
+    <p class="hint">
+      <strong>En la impresora:</strong> papel A4, escala <strong>100%</strong> o «Tamaño real»,
+      desactivá «Ajustar a la página». Recortá por la línea de puntos y pegá sobre el adhesivo del bolsillo.
+    </p>
+    <p class="hint">
+      Alternativa sin esta página: generá el QR en
+      <a href="https://www.qr-code-generator.com/" target="_blank" rel="noopener">qr-code-generator.com</a>
+      o <a href="https://goqr.me/" target="_blank" rel="noopener">goqr.me</a>
+      y descargalo; acá el tamaño ya queda calzado.
+    </p>
+  </div>
+
+  <div class="sheet" id="sheet">
+    <span class="meta">Papel común A4 · no es adhesivo</span>
+    <h2>Plantilla QR</h2>
+    <hr />
+    <div class="steps">
+      Recortá por la línea de puntos. Pegá en el recuadro de la página «Esta agenda pertenece a».
+      Seis copias por si fallás el corte. Tamaño del adhesivo: 28 × 28 mm.
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="foot">Agenda 2027 · el adhesivo del kit es solo el pedacito del bolsillo</div>
+  </div>
+
+  <script>
+    const tipo = document.getElementById("tipo");
+    const dato = document.getElementById("dato");
+    const ayuda = document.getElementById("ayuda");
+    const label = document.getElementById("datoLabel");
+    const grid = document.getElementById("grid");
+
+    const ayudas = {
+      wa: {
+        label: "Número (con código de país, sin 0 ni 15)",
+        ph: "54911XXXXXXXX",
+        text: "Ejemplo Argentina: <code>54911XXXXXXXX</code> (54 + 9 + área sin 0 + número). El QR abrirá WhatsApp."
+      },
+      tel: {
+        label: "Teléfono internacional",
+        ph: "+54911XXXXXXXX",
+        text: "Formato internacional, ej. <code>+54911XXXXXXXX</code>."
+      },
+      mailto: {
+        label: "Correo electrónico",
+        ph: "hola@correo.com",
+        text: "Al escanear se abre un mail a esa dirección."
+      },
+      url: {
+        label: "URL completa",
+        ph: "https://instagram.com/tuusuario",
+        text: "Incluí <code>https://</code>. Sirve para Instagram, web o formularios."
+      },
+      text: {
+        label: "Texto",
+        ph: "Si encontrás esta agenda, escribime al …",
+        text: "Texto libre que se lee al escanear (sin abrir una app concreta)."
+      }
+    };
+
+    tipo.addEventListener("change", () => {
+      const a = ayudas[tipo.value];
+      label.textContent = a.label;
+      dato.placeholder = a.ph;
+      ayuda.innerHTML = a.text;
+    });
+
+    function payload() {
+      const v = dato.value.trim();
+      if (!v) return null;
+      switch (tipo.value) {
+        case "wa": {
+          const n = v.replace(/[^\d]/g, "");
+          return "https://wa.me/" + n;
+        }
+        case "tel":
+          return "tel:" + v.replace(/\s/g, "");
+        case "mailto":
+          return "mailto:" + v;
+        case "url":
+          return /^https?:\/\//i.test(v) ? v : "https://" + v;
+        default:
+          return v;
+      }
+    }
+
+    function makeQrDataUrl(text) {
+      const qr = qrcode(0, "M");
+      qr.addData(text);
+      qr.make();
+      // módulo en px para nitidez; luego CSS lo fija a 23mm
+      return qr.createDataURL(8, 2);
+    }
+
+    function generar() {
+      const text = payload();
+      if (!text) {
+        alert("Completá el dato primero.");
+        return;
+      }
+      grid.innerHTML = "";
+      const url = makeQrDataUrl(text);
+      for (let i = 0; i < 6; i++) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        const img = document.createElement("img");
+        img.alt = "QR";
+        img.src = url;
+        cell.appendChild(img);
+        grid.appendChild(cell);
+      }
+      document.getElementById("sheet").style.display = "block";
+    }
+
+    document.getElementById("btnGen").addEventListener("click", generar);
+    document.getElementById("btnPrint").addEventListener("click", () => {
+      if (!grid.children.length) generar();
+      if (!grid.children.length) return;
+      window.print();
+    });
+  </script>
+</body>
+</html>
